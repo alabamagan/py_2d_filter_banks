@@ -1,8 +1,10 @@
 import numpy as np
 from abc import ABCMeta, abstractmethod
 
+
 class FilterBankNodeBase(object):
     __metaclass__ = ABCMeta
+
     def __init__(self, inNode=None):
         self._input_node = None
         self._inflow = None
@@ -96,7 +98,6 @@ class FilterBankNodeBase(object):
             factor = np.array(factor)
 
         self._shift = factor
-
 
     @staticmethod
     def periodic_modulus_2d(arr, x_range, y_range):
@@ -228,7 +229,6 @@ class Downsample(FilterBankNodeBase):
                         except:
                             print i, j
                             pass
-
 
         self._omega = omega # temp
         self._outflow = np.stack(outflow, -1)
