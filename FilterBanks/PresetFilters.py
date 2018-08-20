@@ -181,6 +181,7 @@ class DirectionalFilterBankDown(PresetFilterBase):
     def run(self, inflow):
         return self._d3.run(inflow)
 
+
 class DirectionalFilterBankUp(PresetFilterBase):
     def __init__(self):
         super(DirectionalFilterBankUp, self).__init__(None)
