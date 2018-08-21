@@ -28,14 +28,17 @@ class PresetFilterBase(FilterBankNodeBase):
 
 
     def hook_input(self, node):
-        self._in_node = node
+        self._input_node = node
 
     @abstractmethod
     def _core_function(self, inflow):
         pass
 
     def run(self, inflow):
-        return self._core_function(inflow)
+        if not self._input_node is None:
+            return self._core_function(self._input_node.run(inflow))
+        else:
+            return self._core_function(inflow)
 
 class ParalleloidDecimator(Downsample):
     def __init__(self, direction, inNode=None):
@@ -127,20 +130,20 @@ class DirectionalDecimator(PresetFilterBase):
             return self._outflow
 
     def run(self, inflow):
-        if self._in_node is None:
+        if self._input_node is None:
             return self._core_function(inflow)
         else:
-            return self._core_function(self._in_node.run(inflow))
+            return self._core_function(self._input_node.run(inflow))
 
     def hook_input(self, node):
         assert isinstance(node, TwoBandDownsample) or node is None
-        self._in_node = node
+        self._input_node = node
 
 
 class DirectionalInterpolator(PresetFilterBase):
     def __init__(self):
         super(DirectionalInterpolator, self).__init__()
-        self._in_node = None
+        self._input_node = None
 
         self._i1c = ParalleloidUpsampler('1c')
         self._i1r = ParalleloidUpsampler('1r')
@@ -164,13 +167,13 @@ class DirectionalInterpolator(PresetFilterBase):
             return self._outflow
 
     def run(self, inflow):
-        if self._in_node is None:
+        if self._input_node is None:
             return self._core_function(inflow)
         else:
-            return self._core_function(self._in_node.run(inflow))
+            return self._core_function(self._input_node.run(inflow))
 
     def hook_input(self, node):
-        self._in_node = node
+        self._input_node = node
 
 
 class DirectionalFilterBankDown(PresetFilterBase):
@@ -189,9 +192,10 @@ class DirectionalFilterBankUp(PresetFilterBase):
     def __init__(self, inNode=None):
         super(DirectionalFilterBankUp, self).__init__(inNode)
 
+        # Note that preset fan interpolator is a two-band upsampler
+        # it runs recursively until there are only only one last layer
         self._u1 = DirectionalInterpolator()
         self._u2 = FanInterpolator(self._u1)
-        self._u3 = FanInterpolator(self._u2)
 
     def _core_function(self, inflow):
-        return self._u3.run(inflow)
+        return self._u2.run(inflow)
