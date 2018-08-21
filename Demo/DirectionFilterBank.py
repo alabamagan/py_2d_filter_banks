@@ -23,7 +23,7 @@ if __name__ == '__main__':
 
     '''Create filter tree'''
     P_0 = DirectionalFilterBankDown()
-    # U_0 = DirectionalFilterBankUp()
+    U_0 = DirectionalFilterBankUp(P_0)
 
     outnode = P_0
     out = outnode.run(s_fftim)

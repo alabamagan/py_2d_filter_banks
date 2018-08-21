@@ -101,9 +101,8 @@ class ParalleloidUpsampler(Upsample):
 
 
 class DirectionalDecimator(PresetFilterBase):
-    def __init__(self):
-        super(DirectionalDecimator, self).__init__()
-        self._in_node = None
+    def __init__(self, inNode=None):
+        super(DirectionalDecimator, self).__init__(inNode)
 
         self._d1c = ParalleloidDecimator('1c')    # map to 0
         self._d1r = ParalleloidDecimator('1r')    # map to 3
@@ -180,16 +179,15 @@ class DirectionalFilterBankDown(PresetFilterBase):
 
         self._d1 = FanDecimator()
         self._d2 = FanDecimator(self._d1)
-        self._d3 = DirectionalDecimator()
-        self._d3.hook_input(self._d2)
+        self._d3 = DirectionalDecimator(self._d2)
 
     def _core_function(self, inflow):
         return self._d3.run(inflow)
 
 
 class DirectionalFilterBankUp(PresetFilterBase):
-    def __init__(self):
-        super(DirectionalFilterBankUp, self).__init__(None)
+    def __init__(self, inNode=None):
+        super(DirectionalFilterBankUp, self).__init__(inNode)
 
         self._u1 = DirectionalInterpolator()
         self._u2 = FanInterpolator(self._u1)
