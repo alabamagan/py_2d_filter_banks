@@ -18,10 +18,10 @@ class FanInterpolator(TwoBandUpsample):
         pass
 
 
-class PresetFilterBase(object):
+class PresetFilterBase(FilterBankNodeBase):
     __metaclass__ = ABCMeta
-
     def __init__(self, inNode=None):
+        super(PresetFilterBase, self).__init__(inNode)
         if not inNode is None:
             self.hook_input(inNode)
         pass
@@ -31,8 +31,11 @@ class PresetFilterBase(object):
         self._in_node = node
 
     @abstractmethod
-    def run(self, inflow):
+    def _core_function(self, inflow):
         pass
+
+    def run(self, inflow):
+        return self._core_function(inflow)
 
 class ParalleloidDecimator(Downsample):
     def __init__(self, direction, inNode=None):
@@ -97,7 +100,7 @@ class ParalleloidUpsampler(Upsample):
         return self._outflow
 
 
-class DirectionalDecimator(object):
+class DirectionalDecimator(PresetFilterBase):
     def __init__(self):
         super(DirectionalDecimator, self).__init__()
         self._in_node = None
@@ -121,7 +124,8 @@ class DirectionalDecimator(object):
             t2 = self._d2r.run(inflow[:,:,2])
             t3 = self._d1r.run(inflow[:,:,3])
 
-            return np.concatenate([t0, t1, t2, t3], axis=-1)
+            self._outflow = np.concatenate([t0, t1, t2, t3], axis=-1)
+            return self._outflow
 
     def run(self, inflow):
         if self._in_node is None:
@@ -130,11 +134,11 @@ class DirectionalDecimator(object):
             return self._core_function(self._in_node.run(inflow))
 
     def hook_input(self, node):
-        assert isinstance(node, TwoBandDownsample)
+        assert isinstance(node, TwoBandDownsample) or node is None
         self._in_node = node
 
 
-class DirectionalInterpolator(object):
+class DirectionalInterpolator(PresetFilterBase):
     def __init__(self):
         super(DirectionalInterpolator, self).__init__()
         self._in_node = None
@@ -157,7 +161,8 @@ class DirectionalInterpolator(object):
             t2 = self._i2r.run(inflow[:,:,4:6])
             t3 = self._i1r.run(inflow[:,:,6:8])
 
-            return np.stack([t0, t1, t2, t3], axis=-1)
+            self._outflow = np.stack([t0, t1, t2, t3], axis=-1)
+            return self._outflow
 
     def run(self, inflow):
         if self._in_node is None:
@@ -178,7 +183,7 @@ class DirectionalFilterBankDown(PresetFilterBase):
         self._d3 = DirectionalDecimator()
         self._d3.hook_input(self._d2)
 
-    def run(self, inflow):
+    def _core_function(self, inflow):
         return self._d3.run(inflow)
 
 
@@ -190,5 +195,5 @@ class DirectionalFilterBankUp(PresetFilterBase):
         self._u2 = FanInterpolator(self._u1)
         self._u3 = FanInterpolator(self._u2)
 
-    def run(self, inflow):
+    def _core_function(self, inflow):
         return self._u3.run(inflow)

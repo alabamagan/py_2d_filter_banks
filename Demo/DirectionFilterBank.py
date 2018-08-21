@@ -1,12 +1,16 @@
-from FilterBanks import DirectionalDicimator, DirectionalInterpolator, FanDecimator
+from FilterBanks import DirectionalFilterBankDown, DirectionalFilterBankUp
+from imageio import imread
+import matplotlib.pyplot as plt
+from numpy.fft import fftshift, fft2, ifft2, ifftshift
+
 
 ''' Testing'''
 if __name__ == '__main__':
-    from imageio import imread
-    import matplotlib.pyplot as plt
-    from numpy.fft import fftshift, fft2, ifft2, ifftshift
 
-    im = imread('../../Materials/s0.tif')
+    '''Prepare input image'''
+    im = imread('./Materials/lena_gray.png')[:,:,0]
+
+    '''Instruction to manual phase shift'''
     # # These phase shift operations can produce fan filter effect, but introduce the need to do fftshift
     # x, y = np.meshgrid(np.arange(im.shape[0]), np.arange(im.shape[1]))
     # px = np.zeros(im.shape, dtype=np.complex)
@@ -18,18 +22,11 @@ if __name__ == '__main__':
     s_fftim = fftshift(fft2(ifftshift(im)))
 
     '''Create filter tree'''
-    P_0 = DirectionalDicimator()
-    p_0 = DirectionalInterpolator()
-    H_0 = FanDecimator()
-    H_1 = FanDecimator()
-    H_1.hook_input(H_0)
-    P_0.hook_input(H_1)
-    p_0.hook_input(P_0)
-
+    P_0 = DirectionalFilterBankDown()
+    # U_0 = DirectionalFilterBankUp()
 
     outnode = P_0
     out = outnode.run(s_fftim)
-    # out = outnode.run(s_fftim)
 
 
     '''Display image'''
@@ -55,19 +52,4 @@ if __name__ == '__main__':
             axs[i//ncol, i%ncol].set_title('%s'%i)
     plt.show()
 
-    '''Test frequency support calculation'''
-    # M = len(outnode._support)
-    # ncol=3
-    # fig, axs = plt.subplots(int(np.ceil(M / float(ncol))), int(ncol))
-    # for i in xrange(M):
-    #     if M <= ncol:
-    #         try:
-    #             axs[i].imshow(outnode._support[i])
-    #         except:
-    #             pass
-    #     else:
-    #         axs[i//ncol, i%ncol].imshow(outnode._support[i])
-    # # # axs[-1, -1].imshow(np.sum(np.stack([G_0._support[i].astype('int') for i in xrange(M)]), 0))
-    # plt.imshow(np.sum(np.stack([outnode._support[i].astype('int') for i in xrange(M)]), 0))
-    # plt.show()
-    #
+
