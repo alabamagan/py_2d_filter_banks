@@ -34,7 +34,7 @@ if __name__ == '__main__':
     s0_subbands = P_0.run(s_fftim)
     gt_subbands = P_0.run(s_sfftimgt)
 
-    for i in xrange(1, 7):
+    for i in xrange(0, 7):
         s0_subbands[:,:,i] = gt_subbands[:,:,i]
 
     recovered = U_0.run(s0_subbands)
