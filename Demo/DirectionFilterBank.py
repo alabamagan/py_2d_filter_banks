@@ -1,9 +1,8 @@
 from FilterBanks import DirectionalFilterBankDown, DirectionalFilterBankUp
 from imageio import imread
-import matplotlib.pyplot as plt
-from numpy.fft import fftshift, fft2, ifft2, ifftshift
+from numpy.fft import fftshift, fft2, ifftshift
 
-from Utility import display_subbands
+from FilterBanks.Functions.Utility import display_subbands
 
 ''' Testing'''
 if __name__ == '__main__':
@@ -28,11 +27,11 @@ if __name__ == '__main__':
 
     outnode = U_0
     out = P_0.run(s_fftim)
-    recovered = outnode.run(s_fftim)
+    # recovered = outnode.run(s_fftim)
 
     '''Display recovered image'''
-    plt.imshow(ifft2(fftshift(recovered)).real - ifftshift(im))
-    plt.show()
+    # plt.imshow(ifft2(fftshift(recovered)).real - ifftshift(im))
+    # plt.show()
 
     '''Display subband components'''
     display_subbands(out, ncol=4)

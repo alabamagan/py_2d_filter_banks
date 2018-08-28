@@ -2,10 +2,9 @@ from FilterBanks import DirectionalFilterBankDown, DirectionalFilterBankUp
 from imageio import imread
 from numpy.fft import fftshift, fft2, ifft2, ifftshift
 
-import matplotlib.pyplot as plt
 import numpy as np
 
-from Utility import display_images
+from FilterBanks.Functions.Utility import display_images
 
 ''' Testing'''
 if __name__ == '__main__':

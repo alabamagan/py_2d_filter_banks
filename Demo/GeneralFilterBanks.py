@@ -4,7 +4,7 @@ from numpy.fft import fftshift, fft2, ifft2, ifftshift
 import matplotlib.pyplot as plt
 import numpy as np
 
-from Utility import display_subbands
+from FilterBanks.Functions.Utility import display_subbands
 
 if __name__ == '__main__':
     im = imread('../../Materials/lena_gray.png')[:,:,0]
