@@ -9,7 +9,7 @@ def display_subbands(image, ncol=2, display_freq=False, cmap='Greys_r'):
 
     if image.ndim == 3:
         M = image.shape[-1]
-        fig, axs = plt.subplots(M / ncol, ncol)
+        fig, axs = plt.subplots(int(np.ceil(M / float(ncol))), ncol)
         for i in xrange(M):
             if M <= ncol:
                 try:
@@ -29,4 +29,28 @@ def display_subbands(image, ncol=2, display_freq=False, cmap='Greys_r'):
         plt.show()
     elif image.ndim == 2:
         plt.imshow(image, cmap=cmap)
+        plt.show()
+
+def display_images(image, ncol=2, cmap='Greys_r'):
+    ncol = int(ncol)
+    assert ncol > 0
+    assert isinstance(image, np.ndarray)
+
+    if image.ndim == 3:
+        M = image.shape[-1]
+        fig, axs = plt.subplots(int(np.ceil(M / float(ncol))), ncol)
+        for i in xrange(M):
+            if M <= ncol:
+                try:
+                    axs[i].imshow(np.real(image[:,:,i]), cmap=cmap)
+                    axs[i].set_title('%s'%i)
+                except:
+                    pass
+            else:
+                print image.shape
+                axs[i//ncol, i%ncol].imshow(np.real(image[:,:,i]), cmap=cmap)
+                axs[i//ncol, i%ncol].set_title('%s'%i)
+        plt.show()
+    elif image.ndim == 2:
+        plt.imshow(np.real(image), cmap=cmap)
         plt.show()
