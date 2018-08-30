@@ -39,6 +39,7 @@ class FilterBankNodeBase(object):
 
     def hook_input(self, filter):
         if filter == None:
+            self._input_node = None
             return
 
         assert issubclass(type(filter), FilterBankNodeBase)

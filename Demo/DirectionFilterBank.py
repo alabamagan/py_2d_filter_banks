@@ -26,7 +26,7 @@ if __name__ == '__main__':
     U_0 = DirectionalFilterBankUp(P_0)
 
     outnode = U_0
-    out = P_0.run(s_fftim)
+    out = P_0.run(im)
     # recovered = outnode.run(s_fftim)
 
     '''Display recovered image'''

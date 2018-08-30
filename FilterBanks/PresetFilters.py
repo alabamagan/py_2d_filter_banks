@@ -24,15 +24,59 @@ class PresetFilterBase(FilterBankNodeBase):
         super(PresetFilterBase, self).__init__(inNode)
         if not inNode is None:
             self.hook_input(inNode)
+
+        self._shrink = False
         pass
 
 
     def hook_input(self, node):
         self._input_node = node
 
+    @staticmethod
+    def _alternate_sampling(inarr, mode='col'):
+        assert isinstance(inarr, np.ndarray)
+
+        if mode == 'col':
+            s = np.array(inarr.shape)
+            s[1] /= 2
+            out = np.zeros(s, dtype=inarr.dtype)
+            out[::2,:] = np.copy(inarr[::2,::2])
+            out[1::2,:] = np.copy(inarr[1::2,1::2])
+            return out
+        elif mode == 'row':
+            s = np.array(inarr.shape)
+            s[0] /= 2
+            out = np.zeros(s , dtype=inarr.dtype)
+            out[:,::2] = np.copy(inarr[::2,::2])
+            out[:,1::2] = np.copy(inarr[1::2,1::2])
+            return out
+
+    @staticmethod
+    def _alternate_zeropadding(inarr, mode='col'):
+        assert isinstance(inarr, np.ndarray)
+
+
+        if mode == 'col':
+            s = np.array(inarr.shape)
+            s[1] *= 2
+            out = np.zeros(s, dtype=inarr.dtype)
+            out[::2,::2] = np.copy(inarr[::2,:])
+            out[1::2, 1::2] = np.copy(inarr[1::2, :])
+            return out
+        elif mode == 'row':
+            s = np.array(inarr.shape)
+            s[0] *= 2
+            out = np.zeros(s, dtype=inarr.dtype)
+            out[::2,::2] = np.copy(inarr[:,::2])
+            out[1::2,1::2] = np.copy(inarr[:,1::2])
+            return out
+
     @abstractmethod
     def _core_function(self, inflow):
         pass
+
+    def set_shrink(self, shrink):
+        self._shrink = shrink
 
     def run(self, inflow):
         if not self._input_node is None:
@@ -126,7 +170,15 @@ class DirectionalDecimator(PresetFilterBase):
             t2 = self._d2r.run(inflow[:,:,2])
             t3 = self._d1r.run(inflow[:,:,3])
 
-            self._outflow = np.concatenate([t0, t1, t2, t3], axis=-1)
+            if not self._shrink:
+                self._outflow = np.concatenate([t0, t1, t2, t3], axis=-1)
+            else:
+                t0 = self._alternate_sampling(t0, 'col')
+                t1 = self._alternate_sampling(t1, 'col')
+                t2 = self._alternate_sampling(t2, 'row').transpose(1, 0, 2)
+                t3 = self._alternate_sampling(t3, 'row').transpose(1, 0, 2)
+                self._outflow = np.concatenate([t0, t1, t2, t3], axis=-1)
+
             return self._outflow
 
     def run(self, inflow):
@@ -152,18 +204,34 @@ class DirectionalInterpolator(PresetFilterBase):
 
     def _core_function(self, inflow):
         assert isinstance(inflow, np.ndarray), "Input must be numpy array"
-        assert inflow.shape[0] == inflow.shape[1]
         assert inflow.ndim == 3
+
+        if not self._shrink:
+            assert inflow.shape[0] == inflow.shape[1]
 
         if inflow.shape[-1] > 8:
             pass
         else:
-            t0 = self._i1c.run(inflow[:,:,:2])
-            t1 = self._i2c.run(inflow[:,:,2:4])
-            t2 = self._i2r.run(inflow[:,:,4:6])
-            t3 = self._i1r.run(inflow[:,:,6:8])
+            if not self._shrink:
+                t0 = self._i1c.run(inflow[:,:,:2])
+                t1 = self._i2c.run(inflow[:,:,2:4])
+                t2 = self._i2r.run(inflow[:,:,4:6])
+                t3 = self._i1r.run(inflow[:,:,6:8])
+                self._outflow = np.stack([t0, t1, t2, t3], axis=-1)
 
-            self._outflow = np.stack([t0, t1, t2, t3], axis=-1)
+            else:
+                t0 = self._alternate_zeropadding(inflow[:,:,:2], 'col')
+                t1 = self._alternate_zeropadding(inflow[:,:,2:4], 'col')
+                t2 = self._alternate_zeropadding(inflow[:,:,4:6].transpose(1,0,2), 'row')
+                t3 = self._alternate_zeropadding(inflow[:,:,6:8].transpose(1,0,2), 'row')
+
+                print [t.shape for t in [t0, t1, t2, t3]]
+                t0 = self._i1c.run(t0)
+                t1 = self._i2c.run(t1)
+                t2 = self._i2r.run(t2)
+                t3 = self._i1r.run(t3)
+                self._outflow = np.stack([t0, t1, t2, t3], axis=-1)
+
             return self._outflow
 
     def run(self, inflow):
@@ -184,8 +252,21 @@ class DirectionalFilterBankDown(PresetFilterBase):
         self._d2 = FanDecimator(self._d1)
         self._d3 = DirectionalDecimator(self._d2)
 
+    def set_shrink(self, shrink):
+        super(DirectionalFilterBankDown, self).set_shrink(shrink)
+        self._d3.set_shrink(shrink)
+        # Rearrange pipeline
+        if self._shrink:
+            self._d3.hook_input(None)
+        else:
+            self._d3.hook_input(self._d2)
+
+
     def _core_function(self, inflow):
-        return self._d3.run(inflow)
+        if not self._shrink:
+            return self._d3.run(inflow)
+        else:
+            return self._d3.run(self._d2.run(inflow)[::2,::2])
 
 
 class DirectionalFilterBankUp(PresetFilterBase):
@@ -197,5 +278,23 @@ class DirectionalFilterBankUp(PresetFilterBase):
         self._u1 = DirectionalInterpolator()
         self._u2 = FanInterpolator(self._u1)
 
+    def set_shrink(self, shrink):
+        super(DirectionalFilterBankUp, self).set_shrink(shrink)
+        self._u1.set_shrink(shrink)
+        if shrink:
+            self._u2.hook_input(None)
+        else:
+            self._u2.hook_input(self._u1)
+
     def _core_function(self, inflow):
-        return self._u2.run(inflow)
+        if not self._shrink:
+            return self._u2.run(inflow)
+        else:
+            assert isinstance(inflow, np.ndarray)
+            t = self._u1.run(inflow)
+            s = np.array(t.shape)
+            s[0] *=2
+            s[1] *=2
+            temp = np.zeros(s, dtype=t.dtype)
+            temp[::2,::2] = t
+            return self._u2.run(temp)
