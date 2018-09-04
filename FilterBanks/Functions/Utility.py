@@ -1,4 +1,5 @@
 from numpy.fft import fftshift, ifft2
+from FilterBanks.FilterBanks import FilterBankNodeBase
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -62,3 +63,28 @@ def display_images(image, ncol=2, cmap='Greys_r', range=None):
     elif image.ndim == 2:
         plt.imshow(np.real(image), cmap=cmap)
         plt.show()
+
+def show_sampling_grid(down_node):
+    assert isinstance(down_node, FilterBankNodeBase)
+
+    uv = down_node._uv
+    omega = down_node._omega
+
+    fig, ax = plt.subplots(1, 1)
+    X = np.array(zip(uv[:,:,1].flatten(), uv[:,:,0].flatten()))
+    ax.scatter(X[:,0], X[:,1])
+    for o in omega:
+        OXY = np.array(zip(o[:,:,1].flatten(),
+                           o[:,:,0].flatten()))
+        ax.scatter(OXY[:,0], OXY[:,1], s=5)
+
+    ax.spines['left'].set_position('center')
+    ax.spines['right'].set_color('none')
+    ax.spines['bottom'].set_position('center')
+    ax.spines['top'].set_color('none')
+    ax.spines['left'].set_smart_bounds(True)
+    ax.spines['bottom'].set_smart_bounds(True)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    plt.axis('equal')
+    plt.show()
