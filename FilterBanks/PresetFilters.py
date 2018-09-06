@@ -1,17 +1,17 @@
-from FilterBanks import Upsample, Downsample, FilterBankNodeBase
-from TwoBandFilters import TwoBandDownsample, TwoBandUpsample
+from FilterBanks import Interpolation, Decimation, FilterBankNodeBase
+from TwoBandFilters import TwoBandDecimation, TwoBandInterpolation
 from abc import ABCMeta, abstractmethod
 import numpy as np
 
 
-class FanDecimator(TwoBandDownsample):
+class FanDecimator(TwoBandDecimation):
     def __init__(self, inNode=None):
         super(FanDecimator, self).__init__(inNode)
         self.set_shift([0.5, 0])
         pass
 
 
-class FanInterpolator(TwoBandUpsample):
+class FanInterpolator(TwoBandInterpolation):
     def __init__(self, inNode=None):
         super(FanInterpolator, self).__init__(inNode)
         self.set_shift([0.5, 0])
@@ -84,7 +84,7 @@ class PresetFilterBase(FilterBankNodeBase):
         else:
             return self._core_function(inflow)
 
-class ParalleloidDecimator(Downsample):
+class ParalleloidDecimator(Decimation):
     def __init__(self, direction, inNode=None):
         r"""
         Mapper is as follow when applied to concatenate fan filters
@@ -119,7 +119,7 @@ class ParalleloidDecimator(Downsample):
         return self._outflow
 
 
-class ParalleloidUpsampler(Upsample):
+class ParalleloidUpsampler(Interpolation):
     def __init__(self, direction, inNode=None):
         super(ParalleloidUpsampler, self).__init__(inNode)
 
@@ -188,7 +188,7 @@ class DirectionalDecimator(PresetFilterBase):
             return self._core_function(self._input_node.run(inflow))
 
     def hook_input(self, node):
-        assert isinstance(node, TwoBandDownsample) or node is None
+        assert isinstance(node, TwoBandDecimation) or node is None
         self._input_node = node
 
 

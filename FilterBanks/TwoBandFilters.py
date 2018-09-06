@@ -1,9 +1,9 @@
-from FilterBanks import Upsample, Downsample
+from FilterBanks import Interpolation, Decimation
 import numpy as np
 
-class TwoBandDownsample(Downsample):
+class TwoBandDecimation(Decimation):
     def __init__(self, inNode=None):
-        super(TwoBandDownsample, self).__init__(inNode)
+        super(TwoBandDecimation, self).__init__(inNode)
 
     def _core_function(self, inflow):
         r"""
@@ -16,24 +16,24 @@ class TwoBandDownsample(Downsample):
         assert inflow.shape[0] == inflow.shape[1]
 
         if inflow.ndim == 2:
-            self._outflow = super(TwoBandDownsample, self)._core_function(inflow)
+            self._outflow = super(TwoBandDecimation, self)._core_function(inflow)
             return self._outflow
         else:
-            self._outflow = np.concatenate([super(TwoBandDownsample, self)._core_function(inflow[:, :, i])
+            self._outflow = np.concatenate([super(TwoBandDecimation, self)._core_function(inflow[:, :, i])
                                             for i in xrange(inflow.shape[-1])], axis=2)
             return self._outflow
 
 
-class TwoBandUpsample(Upsample):
+class TwoBandInterpolation(Interpolation):
     def __init__(self, inNode=None):
-        super(TwoBandUpsample, self).__init__(inNode)
+        super(TwoBandInterpolation, self).__init__(inNode)
     
     def _core_function(self, inflow):
         assert isinstance(inflow, np.ndarray), "Input must be numpy array"
         assert inflow.shape[0] == inflow.shape[1]
         assert inflow.ndim == 3
         if inflow.shape[-1] == 2:
-            return super(TwoBandUpsample, self)._core_function(inflow)
+            return super(TwoBandInterpolation, self)._core_function(inflow)
         elif inflow.shape[-1] % 2 == 0:
             l = inflow.shape[-1]
             t0 = np.copy(self._core_function(inflow[:,:,:l//2]))

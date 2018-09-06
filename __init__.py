@@ -1,3 +1,3 @@
 from FilterBanks import *
 
-__all__ = ['Downsample', 'Upsample', 'TwoBandUpsample', 'TwoBandDownsample', 'DirectionalInterpolator', 'DirectionalDicimator', 'ParalleloidDecimator', 'ParalleloidUpsampler']
+__all__ = ['Decimation', 'Interpolation', 'TwoBandInterpolation', 'TwoBandDecimation', 'DirectionalInterpolator', 'DirectionalDicimator', 'ParalleloidDecimator', 'ParalleloidUpsampler']

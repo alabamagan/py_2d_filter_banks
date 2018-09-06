@@ -1,4 +1,4 @@
-from FilterBanks import Downsample, Upsample
+from FilterBanks import Decimation, Interpolation
 from imageio import imread
 from numpy.fft import fftshift, fft2, ifft2, ifftshift
 import matplotlib.pyplot as plt
@@ -23,9 +23,9 @@ if __name__ == '__main__':
     '''
     Sampling matrix setting
     '''
-    H_0 = Downsample()
+    H_0 = Decimation()
     H_0.set_core_matrix(np.array([[2, 0], [1, 1]]))  # Manually set resampling matrix
-    G_0 = Upsample()
+    G_0 = Interpolation()
     G_0.set_core_matrix(np.array([[2, 0], [1, 1]]))  # Upsample and downsample should have same matrix
     G_0.hook_input(H_0)
     out = G_0.run(s_fftim)
