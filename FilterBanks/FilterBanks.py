@@ -159,22 +159,27 @@ class FilterBankNodeBase(object):
 
     @staticmethod
     def _calculate_filter_support(f_size, f_matrix):
+        f_matrix = f_matrix.astype('float')
         cosets = FilterBankNodeBase._calculate_coset(f_matrix)
         inv_mat = np.linalg.inv(f_matrix)
 
         # Build the support with zero offset vector
         u, v = np.meshgrid(np.arange(2*f_size) - f_size, np.arange(2*f_size) - f_size)
-        sup_1 = (inv_mat[0, 0] * u + inv_mat[1, 0] * v <= f_size//2) & \
-                (inv_mat[0, 0] * u + inv_mat[1, 0] * v >= -f_size//2)
-        sup_2 = (inv_mat[0, 1] * u + inv_mat[1, 1] * v <= f_size//2) & \
-                (inv_mat[0, 1] * u + inv_mat[1, 1] * v >= -f_size//2)
+        sup_1 = (f_matrix[0, 0] * v + f_matrix[1, 0] * u <= f_size//2) & \
+                (f_matrix[0, 0] * v + f_matrix[1, 0] * u >= -f_size//2)
+        sup_2 = (f_matrix[0, 1] * v + f_matrix[1, 1] * u <= f_size//2) & \
+                (f_matrix[0, 1] * v + f_matrix[1, 1] * u >= -f_size//2)
         support = (sup_1 & sup_2).astype('int')[f_size//2:f_size//2+f_size, f_size//2:f_size//2+f_size]
 
-        cvs = [V.dot(inv_mat) for V in cosets]
-        return [np.roll(np.roll(support,int(np.round(V[0] * f_size)),
-                                axis=1),
-                        int(np.round(V[1] * f_size)), axis=0)
-                for V in cvs]
+        if np.abs(np.linalg.det(f_matrix)) == 2:
+            #TODO: Investigates if this is legit
+            return [support, np.invert(support.astype('bool'))]
+        else:
+            cvs = [V.dot(inv_mat) for V in cosets]
+            return [np.roll(np.roll(support,int(np.round(V[0] * f_size)),
+                                    axis=1),
+                            int(np.round(V[1] * f_size)), axis=0)
+                    for V in cvs]
 
     @staticmethod
     def check_symmetry(inarr, origin_pos=None):
@@ -197,7 +202,18 @@ class FilterBankNodeBase(object):
         # new = N/2 - old + N/2 -> N - old
         conj = np.roll(np.fliplr(conj), - inarr.shape[1] + 2 * origin_pos[1] + 1, 1)
         conj = np.roll(np.flipud(conj), - inarr.shape[0] + 2 * origin_pos[0] + 1, 0)
-        return np.allclose(conj, inarr, atol=1E-6)
+
+        if not np.allclose(conj, inarr, atol=1E-6):
+            # import matplotlib.pyplot as plt
+            # fig, ax = plt.subplots(1, 3)
+            # ax[0].imshow(conj)
+            # ax[1].imshow(inarr)
+            # ax[2].imshow(conj - inarr)
+            # plt.show()
+
+            return False
+        else:
+            return True
 
 
 class Decimation(FilterBankNodeBase):
@@ -227,7 +243,7 @@ class Decimation(FilterBankNodeBase):
 
         """
         assert isinstance(inflow, np.ndarray), "Input must be numpy array"
-        assert inflow.ndim == 2
+        assert inflow.ndim == 2 or inflow.ndim == 3
         assert inflow.shape[0] == inflow.shape[1]
 
         # if not complex, assume x-space input, do fourier transform
@@ -392,7 +408,9 @@ class FilterNode(FilterBankNodeBase):
         # if not complex, assume x-space input, do fourier transform
         if not np.any(np.iscomplex(inflow)):
             # it is also necessary to shift the origin to the center of the image.
-            self._inflow = np.fft.fftshift(np.fft.fft2(np.fft.ifftshift(inflow)))
+            self._inflow = np.fft.fftshift(np.fft.fft2(np.fft.ifftshift(inflow, axes=[0, 1]),
+                                                       axes=[0, 1]),
+                                           axes=[0, 1])
         else:
             self._inflow = np.copy(inflow)
 
@@ -400,7 +418,7 @@ class FilterNode(FilterBankNodeBase):
         self.set_core_matrix(self._core_matrix)
 
         # Shift the filter if necessary
-        if self._shift != 0:
+        if np.any(self._shift != 0):
             self._filter = [self._frequency_modulation(f, self._shift) for f in self._filter]
 
         self._check_filter_completeness()
@@ -408,12 +426,12 @@ class FilterNode(FilterBankNodeBase):
         # Multiply filter with frequency signals
         if inflow.ndim == 2:
             # create a new output
-            out = np.stack([np.zeros_like(inflow) for i in xrange(len(self._filter))], -1)
+            out = np.stack([np.zeros_like(self._inflow) for i in xrange(len(self._filter))], -1)
             for i in xrange(len(self._filter)):
-                out[:,:,i] = inflow * self._filter[i]
+                out[:,:,i] = self._inflow * self._filter[i]
         elif inflow.ndim == 3:
             fs = np.stack(self._filter, -1)
-            out = inflow * fs
+            out = self._inflow * fs
         else:
             raise AssertionError("Should not reach this point!")
 
@@ -427,6 +445,6 @@ class FilterNode(FilterBankNodeBase):
             if not self.check_symmetry(f):
                 print "Warning! A filter doesn't have symmetry!"
 
-        if not np.allclose(np.ones_like(self._filter[0]), np.sum(np.stack(self._filter)),
+        if not np.allclose(np.ones_like(self._filter[0]), np.sum(np.stack(self._filter,-1), -1),
                            atol=1E-12):
             print "Warning! Filters are not conservative!"
