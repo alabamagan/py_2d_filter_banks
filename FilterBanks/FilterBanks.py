@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.ndimage as ndimage
 from abc import ABCMeta, abstractmethod
 
 
@@ -286,6 +287,7 @@ class Decimation(FilterBankNodeBase):
                             print i, j
                             pass
 
+        self._outflow = outflow
         self._uv = np.stack([u, v], axis=-1)    # temp
         self._omega = omega # temp
         return self._outflow
@@ -380,6 +382,8 @@ class FilterNode(FilterBankNodeBase):
         super(FilterNode, self).__init__(inNode)
         self.set_core_matrix(core_matrix)
         self._filter = None
+        self._pre_mat = None
+        self._post_mat = None
 
     def set_core_matrix(self, mat):
         super(FilterNode, self).set_core_matrix(mat)
@@ -400,6 +404,23 @@ class FilterNode(FilterBankNodeBase):
 
         self._shift = factor
 
+    def set_post_modulation_matrix(self, mat):
+        r"""set_post_modulaition_matrix
+
+        Additional option offer to transform the filter after frequency shifts.
+
+        It is sometimes more convinient to engage
+        """
+        self._post_mat = mat
+
+    def set_pre_modulation_matrix(self, mat):
+        r"""set_pre_modulation_matrix
+
+        Additional option offer to transform the fitler before frequecy shifts.
+        """
+        self._pre_mat = mat
+
+
     def _core_function(self, inflow):
         assert isinstance(inflow, np.ndarray), "Input must be numpy array"
         assert inflow.ndim == 2 or inflow.ndim == 3
@@ -417,9 +438,33 @@ class FilterNode(FilterBankNodeBase):
         # Calculate filter based on core_matrix
         self.set_core_matrix(self._core_matrix)
 
+        # Transform the filter if necessary
+        if not self._pre_mat is None:
+            # note that after transform, the origin is shifted to upper left corner, we can use fftshift to
+            # undo this effect
+            self._filter = [np.fft.fftshift(ndimage.affine_transform(f,
+                                                                     self._pre_mat.T,
+                                                                     order=0,
+                                                                     mode='wrap',
+                                                                     offset=inflow.shape[0]//2))
+                            for f in self._filter]
+            pass
+
         # Shift the filter if necessary
         if np.any(self._shift != 0):
             self._filter = [self._frequency_modulation(f, self._shift) for f in self._filter]
+
+        # Transform the filter if necessary
+        if not self._post_mat is None:
+            # note that after transform, the origin is shifted to upper left corner, we can use fftshift to
+            # undo this effect
+            self._filter = [np.fft.fftshift(ndimage.affine_transform(np.fft.fftshift(f),
+                                                                     self._post_mat.T,
+                                                                     order=0,
+                                                                     mode='wrap',
+                                                                     ))
+                            for f in self._filter]
+            pass
 
         self._check_filter_completeness()
 
@@ -430,8 +475,13 @@ class FilterNode(FilterBankNodeBase):
             for i in xrange(len(self._filter)):
                 out[:,:,i] = self._inflow * self._filter[i]
         elif inflow.ndim == 3:
-            fs = np.stack(self._filter, -1)
-            out = self._inflow * fs
+            # each of the channel is filtered by all filters
+            N = self._inflow.shape[-1]
+            out = [[self._inflow[:,:,i]] * len(self._filter) for i in xrange(self._inflow.shape[-1])]
+            out = [a for b in out for a in b]   # flattenlist
+            out = np.stack(out, -1)
+            fs = np.stack(self._filter * N, -1)
+            out = out * fs
         else:
             raise AssertionError("Should not reach this point!")
 
@@ -448,3 +498,4 @@ class FilterNode(FilterBankNodeBase):
         if not np.allclose(np.ones_like(self._filter[0]), np.sum(np.stack(self._filter,-1), -1),
                            atol=1E-12):
             print "Warning! Filters are not conservative!"
+
