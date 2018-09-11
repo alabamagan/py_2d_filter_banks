@@ -21,8 +21,12 @@ def LPIIR8(z):
     [2] Smith, Mark JT, and Steven L. Eddins. "Analysis/synthesis techniques for subband image coding."
         IEEE Transactions on Acoustics, Speech, and Signal Processing 38.8 (1990): 1446-1456.
 
+
+    Parameters
+    ==========
+
     :param z: Z of z transform
-    :return:
+    :return: np.ndarrary
     """
 
     def I(omega, z):
@@ -40,9 +44,38 @@ def LPIIR8(z):
 
 
 def LPIIR8_Poly(z):
-    r"""Filter extracted from [2] based on [1]
+    r"""LPIIR8_Poly --> np.ndarray, np.ndarray
 
-    The polyphase representation of LIPIIR8
+    Description
+    ===========
+        The polyphase representation of LIPIIR8(z) (see also `LPIIR8(z)`). The coefficents of the
+        terms are listed as follow:
+
+        ============    =============
+        |Power of z|    |Coefficient|
+        ============    =============
+        0               1
+        -1              4.87627657
+        -2              12.94597729
+        -3              23.28196200
+        -4              30.77687426
+        -5              30.77687426
+        -6              23.28196200
+        -7              12.94597729
+        -8              4.87627567
+        -9              1
+        ============    =============
+
+        The denomenator is given by:
+
+        .. math::
+            ((1 + a_1 **2 * z**-2) * (1 + a_1 **-2 * z**-2) * (1 + a_2**2 * z**-2) * (1 + a_2**-2 * z**-2))
+
+
+    Parameters
+    ==========
+    :param: z: Z of z transform
+    :return: np.ndarray, np.ndarray
     """
     a_1 = 2.24245241
     a_2 = 1.14369193
