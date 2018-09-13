@@ -1,3 +1,3 @@
 import Utility
-
-__all__ = ['Utility']
+import SNF
+__all__ = ['Utility', 'SNF']
