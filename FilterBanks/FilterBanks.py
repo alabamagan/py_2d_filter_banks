@@ -34,9 +34,9 @@ class FilterBankNodeBase(object):
             return self._core_function(self._input_node.run(input))
 
     def set_core_matrix(self, mat):
-        assert isinstance(mat, np.ndarray)
+        assert isinstance(mat, np.ndarray) or isinstance(mat, np.matrix)
 
-        self._core_matrix = mat
+        self._core_matrix = np.array(mat)
         self._coset_vectors = self._calculate_coset(self._core_matrix)
 
     def hook_input(self, filter):
@@ -166,9 +166,9 @@ class FilterBankNodeBase(object):
 
         # Build the support with zero offset vector
         u, v = np.meshgrid(np.arange(2*f_size) - f_size, np.arange(2*f_size) - f_size)
-        sup_1 = (f_matrix[0, 0] * v + f_matrix[1, 0] * u <= f_size//2) & \
+        sup_1 = (f_matrix[0, 0] * v + f_matrix[1, 0] * u < f_size//2) & \
                 (f_matrix[0, 0] * v + f_matrix[1, 0] * u >= -f_size//2)
-        sup_2 = (f_matrix[0, 1] * v + f_matrix[1, 1] * u <= f_size//2) & \
+        sup_2 = (f_matrix[0, 1] * v + f_matrix[1, 1] * u < f_size//2) & \
                 (f_matrix[0, 1] * v + f_matrix[1, 1] * u >= -f_size//2)
         support = (sup_1 & sup_2).astype('int')[f_size//2:f_size//2+f_size, f_size//2:f_size//2+f_size]
 
@@ -223,6 +223,7 @@ class Decimation(FilterBankNodeBase):
         self._core_matrix = np.array([[1, -1],
                                       [1,  1]])
         self._coset_vectors = FilterBankNodeBase._calculate_coset(self._core_matrix)
+        self._shrink = False
 
     def _core_function(self, inflow):
         r"""Decimator core function.
@@ -245,7 +246,7 @@ class Decimation(FilterBankNodeBase):
         """
         assert isinstance(inflow, np.ndarray), "Input must be numpy array"
         assert inflow.ndim == 2 or inflow.ndim == 3
-        assert inflow.shape[0] == inflow.shape[1]
+        assert inflow.shape[0] == inflow.shape[1], inflow.shape
 
         # if not complex, assume x-space input, do fourier transform
         if not np.any(np.iscomplex(inflow)):
@@ -291,6 +292,9 @@ class Decimation(FilterBankNodeBase):
         self._uv = np.stack([u, v], axis=-1)    # temp
         self._omega = omega # temp
         return self._outflow
+
+    def set_shrink(self, b):
+        self._shrink = b
 
     def get_lower_subband(self):
         assert not self._outflow is None
@@ -378,17 +382,14 @@ class Interpolation(FilterBankNodeBase):
 
 
 class FilterNode(FilterBankNodeBase):
-    def __init__(self, core_matrix, inNode=None):
+    def __init__(self, inNode=None):
         super(FilterNode, self).__init__(inNode)
-        self.set_core_matrix(core_matrix)
         self._filter = None
         self._pre_mat = None
         self._post_mat = None
 
     def set_core_matrix(self, mat):
-        super(FilterNode, self).set_core_matrix(mat)
-        if not self._inflow is None:
-            self._filter = self._calculate_filter_support(self._inflow.shape[0], mat)
+        raise ArithmeticError("This function is depricated in this class")
         pass
 
     def set_shift(self, factor):
@@ -436,18 +437,23 @@ class FilterNode(FilterBankNodeBase):
             self._inflow = np.copy(inflow)
 
         # Calculate filter based on core_matrix
-        self.set_core_matrix(self._core_matrix)
+        self._prepare_filter(inflow.shape[0])
 
         # Transform the filter if necessary
         if not self._pre_mat is None:
             # note that after transform, the origin is shifted to upper left corner, we can use fftshift to
             # undo this effect
-            self._filter = [np.fft.fftshift(ndimage.affine_transform(f,
-                                                                     self._pre_mat.T,
-                                                                     order=0,
-                                                                     mode='wrap',
-                                                                     offset=inflow.shape[0]//2))
-                            for f in self._filter]
+            for f in self._filter:
+                f.real = np.fft.fftshift(ndimage.affine_transform(np.fft.fftshift(f).real,
+                                                                  self._pre_mat.T,
+                                                                  order=0,
+                                                                  mode='wrap',
+                                                                  ))
+                f.imag = np.fft.fftshift(ndimage.affine_transform(np.fft.fftshift(f).imag,
+                                                                  self._pre_mat.T,
+                                                                  order=0,
+                                                                  mode='wrap',
+                                                                  ))
             pass
 
         # Shift the filter if necessary
@@ -458,12 +464,17 @@ class FilterNode(FilterBankNodeBase):
         if not self._post_mat is None:
             # note that after transform, the origin is shifted to upper left corner, we can use fftshift to
             # undo this effect
-            self._filter = [np.fft.fftshift(ndimage.affine_transform(np.fft.fftshift(f),
-                                                                     self._post_mat.T,
-                                                                     order=0,
-                                                                     mode='wrap',
-                                                                     ))
-                            for f in self._filter]
+            for f in self._filter:
+                f.real = np.fft.fftshift(ndimage.affine_transform(np.fft.fftshift(f).real,
+                                                                  self._post_mat.T,
+                                                                  order=0,
+                                                                  mode='wrap',
+                                                                  ))
+                f.imag = np.fft.fftshift(ndimage.affine_transform(np.fft.fftshift(f).imag,
+                                                                  self._post_mat.T,
+                                                                  order=0,
+                                                                  mode='wrap',
+                                                                  ))
             pass
 
         self._check_filter_completeness()
@@ -491,11 +502,18 @@ class FilterNode(FilterBankNodeBase):
 
 
     def _check_filter_completeness(self):
-        for f in self._filter:
-            if not self.check_symmetry(f):
-                print "Warning! A filter doesn't have symmetry!"
+        pass
+        # for f in self._filter:
+        #     if not self.check_symmetry(f):
+        #         print "Warning! A filter doesn't have symmetry!"
+        #
+        # if not np.allclose(np.ones_like(self._filter[0]), np.sum(np.stack(self._filter,-1), -1),
+        #                    atol=1E-12):
+        #     print "Warning! Filters are not conservative!"
 
-        if not np.allclose(np.ones_like(self._filter[0]), np.sum(np.stack(self._filter,-1), -1),
-                           atol=1E-12):
-            print "Warning! Filters are not conservative!"
-
+    @abstractmethod
+    def _prepare_filter(self, shape):
+        """
+        Core matrix is not useful in filters
+        """
+        pass
