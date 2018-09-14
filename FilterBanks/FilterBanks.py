@@ -367,8 +367,7 @@ class Interpolation(FilterBankNodeBase):
                                 # Note that the matrix are caculate in x, y convention while in numpy it has a [y, x]
                                 # convention
                                 outflow[i,j] += self._inflow[int(o[i,j,1] + s//2),
-                                                             int(o[i,j,0] + s//2), m] * \
-                                                self._support[m][i, j]
+                                                             int(o[i,j,0] + s//2), m]
                             except:
                                 pass
         self._omega = omega # temp
@@ -382,11 +381,12 @@ class Interpolation(FilterBankNodeBase):
 
 
 class FilterNode(FilterBankNodeBase):
-    def __init__(self, inNode=None):
+    def __init__(self, inNode=None, synthesis_mode = False):
         super(FilterNode, self).__init__(inNode)
         self._filter = None
         self._pre_mat = None
         self._post_mat = None
+        self._synthesis_mode = synthesis_mode
 
     def set_core_matrix(self, mat):
         raise ArithmeticError("This function is depricated in this class")
@@ -487,12 +487,17 @@ class FilterNode(FilterBankNodeBase):
                 out[:,:,i] = self._inflow * self._filter[i]
         elif inflow.ndim == 3:
             # each of the channel is filtered by all filters
-            N = self._inflow.shape[-1]
-            out = [[self._inflow[:,:,i]] * len(self._filter) for i in xrange(self._inflow.shape[-1])]
-            out = [a for b in out for a in b]   # flattenlist
-            out = np.stack(out, -1)
-            fs = np.stack(self._filter * N, -1)
-            out = out * fs
+            if not self._synthesis_mode:
+                N = self._inflow.shape[-1]
+                out = [[self._inflow[:,:,i]] * len(self._filter) for i in xrange(self._inflow.shape[-1])]
+                out = [a for b in out for a in b]   # flattenlist
+                out = np.stack(out, -1)
+                fs = np.stack(self._filter * N, -1)
+                out = out * fs
+            else:
+                assert self._inflow.shape[-1] == len(self._filter), "Currently synthesis mode is only for 2-bands filters"
+                out = [self._inflow[:,:,i] * self._filter[i] for i in xrange(len(self._filter))]
+                out = np.stack(out, -1)
         else:
             raise AssertionError("Should not reach this point!")
 

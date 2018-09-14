@@ -7,8 +7,8 @@ import numpy as np
 
 class PresetFilterBase(FilterNode):
     __metaclass__ = ABCMeta
-    def __init__(self, inNode=None):
-        super(PresetFilterBase, self).__init__(inNode)
+    def __init__(self, inNode=None, synthesis_mode = False):
+        super(PresetFilterBase, self).__init__(inNode, synthesis_mode)
         if not inNode is None:
             self.hook_input(inNode)
 
@@ -79,8 +79,7 @@ class FanFilter(PresetFilterBase):
     _G1 = None
 
     def __init__(self, inNode=None, synthesis_mode = False):
-        super(FanFilter, self).__init__(inNode)
-        self._synthesis_mode = synthesis_mode
+        super(FanFilter, self).__init__(inNode, synthesis_mode)
 
     def _prepare_filter(self, shape):
         if FanFilter._analysis_filter is None:
@@ -286,4 +285,4 @@ class DirectionalFilterBankUp(Interpolation):
 
         self._u1 = [Interpolation() for i in xrange(2**level)]
 
-        self._f1 = DirectionalFilter(syn)
+        self._f1 = DirectionalFilter(synthesis_mode=True)
