@@ -220,8 +220,8 @@ class FilterBankNodeBase(object):
 class Decimation(FilterBankNodeBase):
     def __init__(self, inNode=None):
         FilterBankNodeBase.__init__(self, inNode)
-        self._core_matrix = np.array([[1, -1],
-                                      [1,  1]])
+        self._core_matrix = np.array([[1, 1],
+                                      [-1,  1]])
         self._coset_vectors = FilterBankNodeBase._calculate_coset(self._core_matrix)
         self._shrink = False
 
@@ -287,6 +287,7 @@ class Decimation(FilterBankNodeBase):
                         except:
                             print i, j
                             pass
+                    # break
 
         self._outflow = outflow
         self._uv = np.stack([u, v], axis=-1)    # temp
@@ -314,8 +315,8 @@ class Interpolation(FilterBankNodeBase):
     def __init__(self, inNode=None):
         FilterBankNodeBase.__init__(self, inNode)
 
-        self._core_matrix = np.array([[1, -1],
-                                      [1,  1]])
+        self._core_matrix = np.array([[1, 1],
+                                      [-1,  1]])
         self._coset_vectors = FilterBankNodeBase._calculate_coset(self._core_matrix)
 
     def _core_function(self, inflow):
@@ -330,7 +331,7 @@ class Interpolation(FilterBankNodeBase):
         :return:
         """
         assert isinstance(inflow, np.ndarray), "Input must be numpy array"
-        assert inflow.ndim == 3
+        assert inflow.ndim == 2 or inflow.ndim == 3
         assert inflow.shape[0] == inflow.shape[1]
         # assert np.all(np.iscomplex(inflow))
 
@@ -342,34 +343,33 @@ class Interpolation(FilterBankNodeBase):
         s = inflow.shape[0]
 
         u, v = np.meshgrid(np.arange(s) - s//2, np.arange(s)-s//2)
-        self._uv = np.stack([u, v], axis=-1)    # temp
         omega = np.stack([u, v], axis=-1)
 
         # Bands are differed by coset vector calculated from the transpose of the core_matrix
         # Side Note:
         #   In the original design, it should be M^T, but because numpy has a row major
         #   design, therefore, the matrix has to be transposed before applying.
-        omega = [(omega).dot(self._core_matrix) + s*v for v in self._coset_vectors]
+        omega = omega.dot(self._core_matrix)
 
         # Periodic modulus
-        omega = [FilterBankNodeBase.periodic_modulus_2d(o, [-s//2, s//2-1], [-s//2, s//2-1]) for o in omega]
+        omega = FilterBankNodeBase.periodic_modulus_2d(omega, [-s//2, s//2-1], [-s//2, s//2-1])
 
         # Number of bands for the given core matrix to achieve critical sampling.
         M = int(np.abs(np.linalg.det(self._core_matrix)))
 
-        outflow = np.zeros([self._inflow.shape[0], self._inflow.shape[1]], dtype=np.complex)
+        outflow = np.zeros(self._inflow.shape, dtype=np.complex)
         for i in xrange(inflow.shape[0]):
             for j in xrange(inflow.shape[1]):
-                for m in xrange(M):
-                    for k, o in enumerate(omega):
-                        if o[i,j, 0] % 1 == 0 and o[i,j,1] % 1 == 0:
-                            try:
-                                # Note that the matrix are caculate in x, y convention while in numpy it has a [y, x]
-                                # convention
-                                outflow[i,j] += self._inflow[int(o[i,j,1] + s//2),
-                                                             int(o[i,j,0] + s//2), m]
-                            except:
-                                pass
+                o = omega
+                if o[i,j, 0] % 1 == 0 and o[i,j,1] % 1 == 0:
+                    try:
+                        # Note that the matrix are caculate in x, y convention while in numpy it has a [y, x]
+                        # convention
+                        outflow[i,j] += self._inflow[int(o[i,j,1] + s//2),
+                                                     int(o[i,j,0] + s//2)]
+                    except:
+                        pass
+        self._uv = np.stack([u, v], axis=-1)    # temp
         self._omega = omega # temp
         if np.any(self._shift != 0):
             outflow = self._frequency_modulation(outflow, self._shift)

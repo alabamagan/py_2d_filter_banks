@@ -1,7 +1,6 @@
 from FilterBanks import Decimation, Interpolation, FilterNode
 from TwoBandFilters import TwoBandDecimation, TwoBandInterpolation
-from PresetFilters import DirectionalInterpolator,  \
-    DirectionalFilterBankDown, DirectionalFilterBankUp
+from PresetFilters import DirectionalFilterBankDown, DirectionalFilterBankUp
 
-__all__ = ['Decimation', 'Interpolation', 'TwoBandInterpolation', 'TwoBandDecimation', 'DirectionalInterpolator',
+__all__ = ['Decimation', 'Interpolation', 'TwoBandInterpolation', 'TwoBandDecimation',
            'DirectionalFilterBankDown', 'DirectionalFilterBankUp', 'FilterNode']
