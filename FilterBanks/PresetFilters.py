@@ -97,12 +97,13 @@ class FanFilter(PresetFilterBase):
 
             FanFilter._E0 = E0_zz * E0_zzi
             FanFilter._E1 = E1_zz * E1_zzi
-            FanFilter._analysis_filter = [FanFilter._E0 + z1 ** -1 * FanFilter._E1, # H0 = E0 + z^-1 * E1
-                                          FanFilter._E0 - z1 ** -1 * FanFilter._E1] # H1 = E0 - z^-1 * E1
+            FanFilter._analysis_filter = [(FanFilter._E0 + z1 ** -1 * FanFilter._E1)*2, # H0 = E0 + z^-1 * E1
+                                          (FanFilter._E0 - z1 ** -1 * FanFilter._E1)*2] # H1 = E0 - z^-1 * E1
 
+            H0, H1 = FanFilter._analysis_filter
             # Choose synthesis filter accordingly
-            FanFilter._synthesis_filter = [z1 * FanFilter._analysis_filter[0],
-                                           -z1 * FanFilter._analysis_filter[1]]
+            FanFilter._synthesis_filter = [2*H0 / (H0**2 - H1**2),
+                                           -2*H1 / (H0**2 - H1**2)]
 
         elif FanFilter._analysis_filter[0].shape[0] != shape:
             FanFilter._analysis_filter = None
@@ -124,8 +125,8 @@ class DiamondFilter(PresetFilterBase):
     _G1 = None
 
 
-    def __init__(self, inNode=None):
-        super(DiamondFilter, self).__init__(inNode)
+    def __init__(self, inNode=None, synthesis_mode = False):
+        super(DiamondFilter, self).__init__(inNode, synthesis_mode)
 
     def _prepare_filter(self, shape):
         if DiamondFilter._analysis_filter is None:
@@ -139,13 +140,22 @@ class DiamondFilter(PresetFilterBase):
 
             DiamondFilter._E0 = E0_zz * E0_zzi
             DiamondFilter._E1 = E1_zz * E1_zzi
-            DiamondFilter._analysis_filter = [DiamondFilter._E0 + z1 ** -1 * DiamondFilter._E1,
-                                              DiamondFilter._E0 - z1 ** -1 * DiamondFilter._E1]
+            DiamondFilter._analysis_filter = [(DiamondFilter._E0 + z1 ** -1 * DiamondFilter._E1)*2,
+                                              (DiamondFilter._E0 - z1 ** -1 * DiamondFilter._E1)*2]
+
+            H0, H1 = DiamondFilter._analysis_filter
+            # Choose synthesis filter accordingly
+            DiamondFilter._synthesis_filter = [2*H0 / (H0**2 - H1**2),
+                                           -2*H1 / (H0**2 - H1**2)]
+
         elif DiamondFilter._analysis_filter[0].shape[0] != shape:
             DiamondFilter._analysis_filter = None
             self._prepare_filter(shape)
 
-        self._filter = [np.copy(f) for f in DiamondFilter._analysis_filter]
+        if not self._synthesis_mode:
+            self._filter = [np.copy(f) for f in DiamondFilter._analysis_filter]
+        else:
+            self._filter = [np.copy(f) for f in DiamondFilter._synthesis_filter]
 
 
 class CheckBoardFilter(FanFilter):
