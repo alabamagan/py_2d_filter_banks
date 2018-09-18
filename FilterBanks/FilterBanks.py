@@ -222,6 +222,8 @@ class FilterBankNodeBase(object):
     def force_symmetry(infilter, origin_pos=None):
         r"""Force the filter to gain hermitian symmetry
 
+        The fourier transform of a real signal always have Hermitian symmetry, but it is
+        not a sufficient condition for a freqeuncy response to give a real-valued inverse
         """
         assert isinstance(infilter, np.ndarray)
         if origin_pos is None:
@@ -519,10 +521,6 @@ class FilterNode(FilterBankNodeBase):
                 out = np.stack(out, -1)
                 fs = np.stack(self._filter * N, -1)
                 out = out * fs
-            # else:
-            #     assert self._inflow.shape[-1] == len(self._filter), "Currently synthesis mode is only for 2-bands filters"
-            #     out = [self._inflow[:,:,i] * self._filter[i] for i in xrange(len(self._filter))]
-            #     out = np.stack(out, -1)
 
             else:
                 assert self._inflow.shape[-1] % len(self._filter) == 0, "Input dimension dosen't match number of filters."
