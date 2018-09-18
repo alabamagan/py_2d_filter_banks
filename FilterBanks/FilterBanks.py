@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.ndimage as ndimage
+from skimage.transform import warp
 from abc import ABCMeta, abstractmethod
 
 
@@ -190,7 +191,8 @@ class FilterBankNodeBase(object):
             :math:`F(u, v) = F*(-u, -v)`
         given :math:`F(u, v) = \mathscr{F}[f(x, y)]` such that :math:`f(x, y)` is real.
 
-        However, the FFT algorithm shifts the origin of the
+        However, the FFT algorithm shifts the origin of a frequency map so that transforms
+        over origin doesn't preserve its symmetry
 
         """
         assert isinstance(inarr, np.ndarray)
@@ -215,6 +217,20 @@ class FilterBankNodeBase(object):
             return False
         else:
             return True
+
+    @staticmethod
+    def force_symmetry(infilter, origin_pos=None):
+        r"""Force the filter to gain hermitian symmetry
+
+        """
+        assert isinstance(infilter, np.ndarray)
+        if origin_pos is None:
+            origin_pos = np.array(infilter.shape)/2
+        conj = np.conjugate(infilter)
+        conj = np.roll(np.fliplr(conj), - infilter.shape[1] + 2 * origin_pos[1] + 1, 1)
+        conj = np.roll(np.flipud(conj), - infilter.shape[0] + 2 * origin_pos[0] + 1, 0)
+
+        return (conj + infilter) / 2.
 
 
 class Decimation(FilterBankNodeBase):
@@ -412,14 +428,27 @@ class FilterNode(FilterBankNodeBase):
 
         It is sometimes more convinient to engage
         """
-        self._post_mat = mat
+        assert isinstance(mat, np.ndarray) or isinstance(mat, np.matrix)
+
+        if mat.shape[0] == mat.shape[1] == 3:
+            self._post_mat = np.array(mat)
+        elif mat.shape[0] == mat.shape[1] == 2:
+            self._post_mat = np.identity(3)
+            self._post_mat[:2,:2] = mat
+
 
     def set_pre_modulation_matrix(self, mat):
         r"""set_pre_modulation_matrix
 
         Additional option offer to transform the fitler before frequecy shifts.
         """
-        self._pre_mat = mat
+        assert isinstance(mat, np.ndarray) or isinstance(mat, np.matrix)
+
+        if mat.shape[0] == mat.shape[1] == 3:
+            self._pre_mat = np.array(mat)
+        elif mat.shape[0] == mat.shape[1] == 2:
+            self._pre_mat = np.identity(3)
+            self._pre_mat[:2,:2] = mat
 
 
     def _core_function(self, inflow):
@@ -444,16 +473,14 @@ class FilterNode(FilterBankNodeBase):
             # note that after transform, the origin is shifted to upper left corner, we can use fftshift to
             # undo this effect
             for f in self._filter:
-                f.real = np.fft.fftshift(ndimage.affine_transform(np.fft.fftshift(f).real,
-                                                                  self._pre_mat.T,
-                                                                  order=0,
-                                                                  mode='wrap',
-                                                                  ))
-                f.imag = np.fft.fftshift(ndimage.affine_transform(np.fft.fftshift(f).imag,
-                                                                  self._pre_mat.T,
-                                                                  order=0,
-                                                                  mode='wrap',
-                                                                  ))
+                f.real = np.fft.fftshift(warp(np.fft.fftshift(f).real,
+                                              self._pre_mat.T,
+                                              order=0,
+                                              mode='wrap'))
+                f.imag = np.fft.fftshift(warp(np.fft.fftshift(f).imag,
+                                              self._pre_mat.T,
+                                              order=0,
+                                              mode='wrap'))
             pass
 
         # Shift the filter if necessary
@@ -465,16 +492,14 @@ class FilterNode(FilterBankNodeBase):
             # note that after transform, the origin is shifted to upper left corner, we can use fftshift to
             # undo this effect
             for f in self._filter:
-                f.real = np.fft.fftshift(ndimage.affine_transform(np.fft.fftshift(f).real,
-                                                                  self._post_mat.T,
-                                                                  order=0,
-                                                                  mode='wrap',
-                                                                  ))
-                f.imag = np.fft.fftshift(ndimage.affine_transform(np.fft.fftshift(f).imag,
-                                                                  self._post_mat.T,
-                                                                  order=0,
-                                                                  mode='wrap',
-                                                                  ))
+                f.real = np.fft.fftshift(warp(np.fft.fftshift(f).real,
+                                              self._post_mat.T,
+                                              order=0,
+                                              mode='wrap'))
+                f.imag = np.fft.fftshift(warp(np.fft.fftshift(f).imag,
+                                              self._post_mat.T,
+                                              order=0,
+                                              mode='wrap'))
             pass
 
         self._check_filter_completeness()
@@ -494,10 +519,26 @@ class FilterNode(FilterBankNodeBase):
                 out = np.stack(out, -1)
                 fs = np.stack(self._filter * N, -1)
                 out = out * fs
+            # else:
+            #     assert self._inflow.shape[-1] == len(self._filter), "Currently synthesis mode is only for 2-bands filters"
+            #     out = [self._inflow[:,:,i] * self._filter[i] for i in xrange(len(self._filter))]
+            #     out = np.stack(out, -1)
+
             else:
-                assert self._inflow.shape[-1] == len(self._filter), "Currently synthesis mode is only for 2-bands filters"
-                out = [self._inflow[:,:,i] * self._filter[i] for i in xrange(len(self._filter))]
-                out = np.stack(out, -1)
+                assert self._inflow.shape[-1] % len(self._filter) == 0, "Input dimension dosen't match number of filters."
+                out = []
+                for i in xrange(self._inflow.shape[-1] / len(self._filter)):
+                    # Filter
+                    temp = [self._inflow[:,:,i*len(self._filter) + j] * self._filter[j]
+                            for j in xrange(len(self._filter))]
+
+                    # And then sum
+                    out.append(np.sum(np.stack(temp, -1), -1))
+
+                if len(out) > 1:
+                    out = np.stack(out, -1)
+                else:
+                    out = out[0]
         else:
             raise AssertionError("Should not reach this point!")
 
