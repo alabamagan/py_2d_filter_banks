@@ -232,13 +232,12 @@ class DirectionalFilter(PresetFilterBase):
 
             pass
         else:
-            t0 = self._r1.run(inflow[:,:,0])
-            t1 = self._r2.run(inflow[:,:,1])
-            t2 = self._r3.run(inflow[:,:,2])
-            t3 = self._r4.run(inflow[:,:,3])
+            t0 = self._r2.run(inflow[:,:,0])
+            t1 = self._r1.run(inflow[:,:,1])
+            t2 = self._r4.run(inflow[:,:,2])
+            t3 = self._r3.run(inflow[:,:,3])
 
             self._outflow = np.concatenate([t0, t1, t2, t3], axis=-1)
-
             return self._outflow
 
     def _prepare_filter(self, shape):
@@ -256,7 +255,7 @@ class DirectionalFilterBankDown(Decimation):
         self._d1.set_core_matrix(np.mat([[1, 1],[-1,1]]) *
                                  np.mat([[1, 1],[-1,1]]))
 
-        self._f3 = DirectionalFilter()
+        self._f3 = DirectionalFilter(self._d1)
 
         self._decimation = [Decimation() for i in xrange(4)]
         for i in xrange(len(self._decimation)):
@@ -286,7 +285,10 @@ class DirectionalFilterBankDown(Decimation):
 
             return np.concatenate(out, -1)
         else:
-            raise NotImplementedError()
+            temp = self._f3.run(inflow)
+
+            temp = [d.run(temp[:,:,2*i:2*i+2]) for i, d in enumerate(self._decimation)]
+            return np.concatenate(temp, -1)
 
 
 class DirectionalFilterBankUp(Interpolation):
