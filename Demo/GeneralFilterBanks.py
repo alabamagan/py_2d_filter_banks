@@ -1,4 +1,4 @@
-from FilterBanks import Decimation, Interpolation
+from FilterBanks import Decimation, Interpolation, FanFilter
 from imageio import imread
 from numpy.fft import fftshift, fft2, ifft2, ifftshift
 import matplotlib.pyplot as plt
@@ -7,7 +7,7 @@ import numpy as np
 from FilterBanks.Functions.Utility import display_subbands
 
 if __name__ == '__main__':
-    im = imread('../../Materials/lena_gray.png')[:,:,0]
+    im = imread('./Materials/lena_gray.png')[:,:,0]
 
     '''Introduce phase shift in image domain'''
     # # These phase shift operations can produce fan filter effect, but introduce the need to do fftshift
@@ -23,12 +23,13 @@ if __name__ == '__main__':
     '''
     Sampling matrix setting
     '''
-    H_0 = Decimation()
+    F_0 = FanFilter()
+    H_0 = Decimation(F_0)
     H_0.set_core_matrix(np.array([[2, 0], [1, 1]]))  # Manually set resampling matrix
-    G_0 = Interpolation()
+    G_0 = Interpolation(H_0)
     G_0.set_core_matrix(np.array([[2, 0], [1, 1]]))  # Upsample and downsample should have same matrix
-    G_0.hook_input(H_0)
-    out = G_0.run(s_fftim)
+    U_0 = FanFilter(G_0, synthesis_mode=True)
+    out = U_0.run(s_fftim)
 
     '''
     Display subband components
