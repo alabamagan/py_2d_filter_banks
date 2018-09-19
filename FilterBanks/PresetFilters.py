@@ -191,20 +191,18 @@ class ParallelogramFilter(FanFilter):
         else:
             raise AttributeError("Direction argument must be one of ['1c', '1r', '2c', '2r']")
 
-        if direction == '2c' or direction == '2r':
-            Q = Q.T
-
         super(ParallelogramFilter, self).__init__(inNode, synthesis_mode)
         self.set_post_modulation_matrix(np.array(R.T))
 
+        # Follows definition from Park et al. 2004
         if direction == '1c':
-            self._D = np.array(R*Q*ParallelogramFilter._R2)
+            self._D = np.array([[2., 0.], [0., 1.]])
         elif direction == '1r':
-            self._D = np.array(R*Q*ParallelogramFilter._R3)
+            self._D = np.array([[1., 0.], [0., 2.]])
         elif direction == '2r':
-            self._D = np.array(R*Q*ParallelogramFilter._R4)
+            self._D = np.array([[1., 0.], [0., 2.]])
         elif direction == '2c':
-            self._D = np.array(R*Q*ParallelogramFilter._R1)
+            self._D = np.array([[2., 0.], [0., 1.]])
 
 
 
@@ -217,7 +215,7 @@ class DirectionalFilter(PresetFilterBase):
         self._r3 = ParallelogramFilter('1c', synthesis_mode=synthesis_mode)
         self._r4 = ParallelogramFilter('2c', synthesis_mode=synthesis_mode)
 
-        self._ds = [self._r1, self._r2, self._r3, self._r4] # List for convinience
+        self._ds = [self._r3, self._r4, self._r1, self._r2] # List for convinience
 
     def _core_function(self, inflow):
         assert isinstance(inflow, np.ndarray), "Input must be numpy array"
@@ -228,10 +226,10 @@ class DirectionalFilter(PresetFilterBase):
         if self._synthesis_mode:
             assert inflow.shape[-1] == 8
 
-            t0 = self._r3.run(inflow[:,:,:2])   # 1c
-            t1 = self._r4.run(inflow[:,:,2:4])  # 2r
-            t2 = self._r1.run(inflow[:,:,4:6])  # 2c
-            t3 = self._r2.run(inflow[:,:,6:8])  # 1r
+            t0 = self._r3.run(inflow[:,:,:2])
+            t1 = self._r4.run(inflow[:,:,2:4])
+            t2 = self._r1.run(inflow[:,:,4:6])
+            t3 = self._r2.run(inflow[:,:,6:8])
 
             self._outflow = np.stack([t0, t1, t2, t3], axis=-1)
             return self._outflow
@@ -240,15 +238,10 @@ class DirectionalFilter(PresetFilterBase):
 
                 pass
             else:
-                t0 = self._r3.run(inflow[:,:,0]) # 3
-                t1 = self._r4.run(inflow[:,:,1]) # 4
-                t2 = self._r1.run(inflow[:,:,2]) # 1
-                t3 = self._r2.run(inflow[:,:,3]) # 2
-
-                from Functions.Utility import display_subbands
-                display_subbands(np.concatenate([inflow,
-                                           t0, t1, t2, t3], -1), ncol=4, display_freq=True,
-                                 cmap='jet')
+                t0 = self._r3.run(inflow[:,:,0])
+                t1 = self._r4.run(inflow[:,:,1])
+                t2 = self._r1.run(inflow[:,:,2])
+                t3 = self._r2.run(inflow[:,:,3])
 
                 self._outflow = np.concatenate([t0, t1, t2, t3], axis=-1)
                 return self._outflow
@@ -291,10 +284,10 @@ class DirectionalFilterBankDown(Decimation):
             for i, d in enumerate(self._decimation):
                 out.append(d.run(temp[:,:,2*i:2*i+2]))
 
-            out[0] = out[0][::2,:]
-            out[1] = out[1][::2,:]
-            out[2] = out[2][:,::2].transpose(1, 0, 2)
-            out[3] = out[3][:,::2].transpose(1, 0, 2)
+            out[0] = out[0][:,::2]
+            out[1] = out[1][:,::2]
+            out[2] = out[2][::2,:].transpose(1, 0, 2)
+            out[3] = out[3][::2,:].transpose(1, 0, 2)
 
             return np.concatenate(out, -1)
         else:
@@ -311,7 +304,6 @@ class DirectionalFilterBankUp(Interpolation):
         self._f1 = DirectionalFilter(synthesis_mode=True)
         self._u1 = [Interpolation() for i in xrange(2**(level - 1))]
         for i, u in enumerate(self._u1):
-            print self._f1._ds[i]._D
             u.set_core_matrix(self._f1._ds[i]._D)
 
         self._u2 = Interpolation()
@@ -332,20 +324,20 @@ class DirectionalFilterBankUp(Interpolation):
                 # Expand subbands
                 out = np.zeros([s[0], s[1]*2, s[2]], dtype=inflow.dtype)
                 out[:,::2, :4] = inflow[:,:,:4]
-                out[:,::2, 4:] = inflow[::2,:,4:].transpose(1, 0, 2)
+                out[::2,:, 4:] = inflow[:,:,4:].transpose(1, 0, 2)
 
                 # Upsample
-                out = []
+                temp = []
                 for i, u in enumerate(self._u1):
-                    out.append(u.run(inflow[:,:,2*i:2*i+2]))
-                out = np.concatenate(out, -1)
+                    temp.append(u.run(out[:,:,2*i:2*i+2]))
+                out = np.concatenate(temp, -1)
 
                 # Filter
                 out = self._f1.run(out)
 
                 # Expand again
                 ss = out.shape
-                temp = np.zeros([ss[0]*2, ss[1]*2, s[2]], dtype=out.dtype)
+                temp = np.zeros([ss[0]*2, ss[1]*2, out.shape[-1]], dtype=out.dtype)
                 temp[::2,::2, :] = out
 
                 out = self._f3.run(temp)
@@ -358,7 +350,6 @@ class DirectionalFilterBankUp(Interpolation):
             for i, u in enumerate(self._u1):
                 out.append(u.run(inflow[:,:,2*i:2*i+2]))
             out = np.concatenate(out, -1)
-
 
             # Filter
             out = self._f1.run(out)

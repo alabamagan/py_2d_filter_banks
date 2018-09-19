@@ -15,6 +15,7 @@ class FilterBankNodeBase(object):
         self._coset_vectors = []
         self._shift = 0
         self._outflow = None
+        self._shrink = False
         self.hook_input(inNode)
         pass
 
@@ -50,6 +51,10 @@ class FilterBankNodeBase(object):
 
     def input(self):
         return self._input_node
+
+
+    def set_shrink(self, b):
+        self._shrink = b
 
     @staticmethod
     def _calculate_coset(core_matrix):
@@ -241,7 +246,6 @@ class Decimation(FilterBankNodeBase):
         self._core_matrix = np.array([[1, 1],
                                       [-1,  1]])
         self._coset_vectors = FilterBankNodeBase._calculate_coset(self._core_matrix)
-        self._shrink = False
 
     def _core_function(self, inflow):
         r"""Decimator core function.
@@ -311,9 +315,6 @@ class Decimation(FilterBankNodeBase):
         self._uv = np.stack([u, v], axis=-1)    # temp
         self._omega = omega # temp
         return self._outflow
-
-    def set_shrink(self, b):
-        self._shrink = b
 
     def get_lower_subband(self):
         assert not self._outflow is None
